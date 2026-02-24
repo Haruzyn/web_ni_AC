@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gamified Learning Platform</title>
+
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#ffe6f0,#ffd1e3,#ffc2db);
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  min-height:100vh;
+  padding:40px 15px;
+}
+
+header{
+  position:fixed;
+  top:0;
+  width:100%;
+  background:linear-gradient(90deg,#d63384,#b30059);
+  color:white;
+  text-align:center;
+  padding:18px;
+  font-size:1.6rem;
+  font-weight:600;
+  box-shadow:0 4px 15px rgba(0,0,0,0.2);
+}
+
+.container{
+  width:100%;
+  max-width:750px;
+  background:white;
+  padding:35px;
+  margin-top:90px;
+  border-radius:18px;
+  box-shadow:0 15px 40px rgba(214,51,132,0.25);
+}
+
+.hidden{display:none;}
+
+h2{color:#b30059;}
+
+input,textarea{
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border-radius:8px;
+  border:1px solid #ffc2db;
+}
+
+button{
+  background:linear-gradient(90deg,#d63384,#b30059);
+  color:white;
+  border:none;
+  padding:10px 20px;
+  margin-top:15px;
+  border-radius:8px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+button:hover{
+  transform:translateY(-2px);
+}
+
+.stats{
+  background:#fff0f6;
+  padding:20px;
+  border-radius:15px;
+  margin-bottom:25px;
+}
+
+.progress-bar{
+  height:12px;
+  background:#ffd6e8;
+  border-radius:10px;
+  overflow:hidden;
+  margin-top:5px;
+}
+
+.progress-fill{
+  height:100%;
+  background:linear-gradient(90deg,#ff4da6,#d63384);
+  width:0%;
+  transition:0.5s ease;
+}
+
+.card{
+  background:#fff5fa;
+  padding:20px;
+  border-radius:12px;
+  margin-top:20px;
+}
+
+.history{
+  background:#fff0f6;
+  padding:15px;
+  border-radius:12px;
+  margin-top:25px;
+}
+</style>
+</head>
+
+<body>
+
+<header>🎀 Gamified Learning Platform</header>
+
+<!-- LOGIN -->
+<div class="container" id="authSection">
+  <h2>Login / Register</h2>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="register()">Register</button>
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- GAME -->
+<div class="container hidden" id="gameSection">
+
+  <!-- PLAYER STATS (KEPT) -->
+  <div class="stats">
+    <h3>🏆 Player Stats</h3>
+    <p>Level: <span id="level">1</span></p>
+    <p>XP: <span id="xp">0</span> / <span id="xpNeeded">100</span></p>
+    <div class="progress-bar">
+      <div class="progress-fill" id="xpBar"></div>
+    </div>
+    <p>⭐ Points: <span id="points">0</span></p>
+    <p>🔥 Streak: <span id="streak">0</span></p>
+  </div>
+
+  <!-- FLASHCARD -->
+  <h2>📚 Flashcard Game</h2>
+  <textarea id="flashInput" placeholder="term:definition (one per line)"></textarea>
+  <button onclick="generateFlashcards()">Start Flashcards</button>
+  <div id="flashArea"></div>
+
+  <hr style="margin:30px 0">
+
+  <!-- QUIZ -->
+  <h2>📝 Quiz Game</h2>
+  <textarea id="quizInput" placeholder="question|answer (one per line)"></textarea>
+  <button onclick="generateQuiz()">Start Quiz</button>
+  <div id="quizArea"></div>
+
+  <!-- HISTORY -->
+  <div class="history">
+    <h3>📜 Game History</h3>
+    <div id="historyArea"></div>
+  </div>
+
+</div>
+
+<script>
+let currentUser="";
+let level=1,xp=0,points=0,streak=0;
+let flashcards=[],currentCard=0;
+let quizzes=[],currentQuiz=0;
+
+/* ---------------- LOGIN ---------------- */
+
+function register(){
+  let u=username.value.trim(),p=password.value.trim();
+  if(!u||!p) return alert("Fill all fields");
+  if(localStorage.getItem(u)) return alert("User exists");
+  localStorage.setItem(u,p);
+  alert("Registered!");
+}
+
+function login(){
+  let u=username.value.trim(),p=password.value.trim();
+  if(localStorage.getItem(u)===p){
+    currentUser=u;
+    authSection.classList.add("hidden");
+    gameSection.classList.remove("hidden");
+    loadProgress();
+    loadHistory();
+  }else alert("Invalid login");
+}
+
+/* ---------------- XP SYSTEM ---------------- */
+
+function addXP(amount){
+  xp+=amount;
+  let needed=level*100;
+
+  if(xp>=needed){
+    xp=0;
+    level++;
+    alert("🎉 LEVEL UP! Level "+level);
+  }
+
+  saveProgress();
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById("level").textContent=level;
+  document.getElementById("xp").textContent=xp;
+  document.getElementById("xpNeeded").textContent=level*100;
+  document.getElementById("points").textContent=points;
+  document.getElementById("streak").textContent=streak;
+  document.getElementById("xpBar").style.width=(xp/(level*100))*100+"%";
+}
+
+function saveProgress(){
+  localStorage.setItem(currentUser+"_progress",
+    JSON.stringify({level,xp,points,streak}));
+}
+
+function loadProgress(){
+  let data=localStorage.getItem(currentUser+"_progress");
+  if(!data) return;
+  let s=JSON.parse(data);
+  level=s.level;
+  xp=s.xp;
+  points=s.points;
+  streak=s.streak;
+  updateUI();
+}
+
+/* ---------------- HISTORY ---------------- */
+
+function saveHistory(type,total){
+  let data=JSON.parse(localStorage.getItem(currentUser+"_history")||"[]");
+  data.push(type+" completed - "+total+" questions - "+new Date().toLocaleString());
+  localStorage.setItem(currentUser+"_history",JSON.stringify(data));
+  loadHistory();
+}
+
+function loadHistory(){
+  let data=JSON.parse(localStorage.getItem(currentUser+"_history")||"[]");
+  historyArea.innerHTML=data.slice().reverse().map(d=>"<p>"+d+"</p>").join("");
+}
+
+/* ---------------- FLASHCARDS ---------------- */
+
+function generateFlashcards(){
+  let input=flashInput.value.trim();
+  if(!input) return alert("Enter flashcards");
+
+  flashInput.classList.add("hidden");
+
+  flashcards=[];
+  input.split("\n").forEach(line=>{
+    let p=line.split(":");
+    if(p.length===2)
+      flashcards.push({term:p[0].trim(),def:p[1].trim()});
+  });
+
+  currentCard=0;
+  showFlash();
+}
+
+function showFlash(){
+  if(currentCard>=flashcards.length){
+    flashArea.innerHTML="<h3>🏆 Flashcards Completed!</h3>";
+    flashInput.classList.remove("hidden");
+    saveHistory("Flashcards",flashcards.length);
+    return;
+  }
+
+  let c=flashcards[currentCard];
+  flashArea.innerHTML=`
+  <div class="card">
+    <h3>${c.term}</h3>
+    <input type="text" id="flashAnswer">
+    <button onclick="submitFlash()">Submit</button>
+    <p id="flashFeedback"></p>
+  </div>`;
+}
+
+function submitFlash(){
+  let u=flashAnswer.value.trim().toLowerCase();
+  let correct=flashcards[currentCard].def.toLowerCase();
+  let f=document.getElementById("flashFeedback");
+
+  if(u===correct){
+    points+=10;
+    streak++;
+    addXP(20);
+    f.style.color="green";
+    f.textContent="Correct! +10 Points";
+  }else{
+    streak=0;
+    f.style.color="red";
+    f.textContent="Wrong! "+correct;
+  }
+
+  updateUI();
+  setTimeout(()=>{currentCard++;showFlash();},1500);
+}
+
+/* ---------------- QUIZ ---------------- */
+
+function generateQuiz(){
+  let input=quizInput.value.trim();
+  if(!input) return alert("Enter quiz");
+
+  quizInput.classList.add("hidden");
+
+  quizzes=[];
+  input.split("\n").forEach(line=>{
+    let p=line.split("|");
+    if(p.length===2)
+      quizzes.push({question:p[0].trim(),answer:p[1].trim()});
+  });
+
+  currentQuiz=0;
+  showQuiz();
+}
+
+function showQuiz(){
+  if(currentQuiz>=quizzes.length){
+    quizArea.innerHTML="<h3>🎉 Quiz Completed!</h3>";
+    quizInput.classList.remove("hidden");
+    saveHistory("Quiz",quizzes.length);
+    return;
+  }
+
+  let q=quizzes[currentQuiz];
+  quizArea.innerHTML=`
+  <div class="card">
+    <h3>${q.question}</h3>
+    <input type="text" id="quizAnswer">
+    <button onclick="submitQuiz()">Submit</button>
+    <p id="quizFeedback"></p>
+  </div>`;
+}
+
+function submitQuiz(){
+  let u=quizAnswer.value.trim().toLowerCase();
+  let correct=quizzes[currentQuiz].answer.toLowerCase();
+  let f=document.getElementById("quizFeedback");
+
+  if(u===correct){
+    points+=15;
+    streak++;
+    addXP(30);
+    f.style.color="green";
+    f.textContent="Correct! +15 Points";
+  }else{S
+    streak=0;
+    f.style.color="red";
+    f.textContent="Wrong! "+correct;
+  }
+
+  updateUI();
+  setTimeout(()=>{currentQuiz++;showQuiz();},1500);
+}
+</script>
+
+</body>
+</html>
